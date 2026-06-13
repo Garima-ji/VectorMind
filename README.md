@@ -1,3 +1,12 @@
+---
+title: VectorMind Semantic Search API
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+---
+
 # VectorMind – Semantic Search System
 
 VectorMind is a lightweight **semantic search engine** that retrieves relevant documents based on meaning rather than simple keyword matching.
