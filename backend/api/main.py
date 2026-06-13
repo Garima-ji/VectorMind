@@ -1,6 +1,7 @@
-"""FastAPI service for semantic search."""
+"""FastAPI service for semantic search, hybrid retrieval, reranking, and RAG."""
 import os
 import time
+import re
 import psutil
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query
@@ -21,7 +22,15 @@ from backend.utils.cluster_analysis import analyze_clusters
 from backend.data.load_dataset import load_newsgroups_data
 from backend.utils import config
 
-app = FastAPI(title="VectorMind Semantic Search API", version="1.0.0")
+# Import advanced retrieval components
+from backend.vector_db.bm25 import BM25Retriever
+from backend.embeddings.reranker import CrossEncoderReranker
+from backend.utils.generator import RAGGenerator
+from backend.utils.query_expansion import expand_query
+from backend.utils.analytics import AnalyticsTracker
+from backend.utils.evaluator import evaluate_system
+
+app = FastAPI(title="VectorMind Semantic Search API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +48,12 @@ fuzzy_clustering = None
 tfidf_vectorizer = None
 tfidf_matrix = None
 
+# Advanced retrieval global components
+bm25_retriever = None
+reranker = None
+rag_generator = None
+analytics_tracker = None
+
 # Custom Logger
 def log_info(msg: str):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -54,7 +69,13 @@ class SearchResultItem(BaseModel):
     document: str
     similarity_score: float
     cluster: int
-    match_type: str  # "semantic", "keyword", or "hybrid"
+    match_type: str  # "semantic", "keyword", "hybrid", "reranked"
+    # New detailed retrieval fields
+    semantic_score: Optional[float] = None
+    keyword_score: Optional[float] = None
+    rrf_score: Optional[float] = None
+    explanation: Optional[str] = None
+    index: Optional[int] = None
 
 class QueryResponse(BaseModel):
     query: str
@@ -62,16 +83,20 @@ class QueryResponse(BaseModel):
     cache_hit: bool
     matched_query: Optional[str] = None
     similarity_score: float
-    result: str
+    result: str  # Grounded RAG answer
     results: List[SearchResultItem]
     dominant_cluster: int
     cluster_probability: float
     processing_time: float
+    # New advanced RAG/telemetry fields
+    expanded_query: Optional[str] = None
+    sources: Optional[List[str]] = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize system components, load persisted models, or index dataset on startup."""
     global embedding_model, semantic_cache, faiss_index, fuzzy_clustering, tfidf_vectorizer, tfidf_matrix
+    global bm25_retriever, reranker, rag_generator, analytics_tracker
     
     try:
         log_info("Initializing embedding model (all-MiniLM-L6-v2)...")
@@ -108,15 +133,27 @@ async def startup_event():
         # Fit TF-IDF Vectorizer on documents list for Keyword Search
         fit_tfidf_search()
         
+        # Initialize Advanced search components
+        log_info("Initializing BM25 Retriever on loaded documents...")
+        bm25_retriever = BM25Retriever(faiss_index.documents)
+        
+        log_info("Initializing Cross-Encoder Reranker...")
+        reranker = CrossEncoderReranker(model_name=config.RERANKER_MODEL)
+        
+        log_info("Initializing RAG Generator...")
+        rag_generator = RAGGenerator(local_model=config.GENERATOR_MODEL, hf_api_model=config.HF_API_MODEL)
+        
+        log_info("Initializing Analytics Tracker...")
+        analytics_tracker = AnalyticsTracker(filepath=config.ANALYTICS_PATH)
+        
         log_info("VectorMind API initialization completed. Server is READY!")
     except Exception as e:
         log_info(f"Startup error: {e}")
-        # Gracefully proceed so API doesn't crash entirely
         pass
 
 def build_and_persist_index():
     """Build and fit the index/model from raw dataset, then persist them."""
-    global embedding_model, faiss_index, fuzzy_clustering
+    global embedding_model, faiss_index, fuzzy_clustering, bm25_retriever
     
     log_info("Loading newsgroups dataset...")
     raw_data, targets, target_names = load_newsgroups_data()
@@ -137,6 +174,11 @@ def build_and_persist_index():
     faiss_index.save(config.INDEX_PATH, config.DOCS_PATH)
     fuzzy_clustering.save(config.GMM_PATH)
     log_info("Persisted stores saved successfully!")
+    
+    # Re-fit BM25 on indexing
+    if bm25_retriever:
+        log_info("Re-fitting BM25 index...")
+        bm25_retriever.fit(raw_data)
 
 def fit_tfidf_search():
     """Fit TF-IDF on indexed documents for hybrid search fallback/keyword match."""
@@ -146,42 +188,105 @@ def fit_tfidf_search():
         tfidf_matrix = tfidf_vectorizer.fit_transform(faiss_index.documents)
         log_info("TF-IDF vectorizer fitted successfully on index documents.")
 
+def reciprocal_rank_fusion(semantic_results, keyword_results, k_rrf=60):
+    """
+    Reciprocal Rank Fusion (RRF) to merge semantic and keyword search ranks.
+    
+    Args:
+        semantic_results: List of tuples (doc, score, index)
+        keyword_results: List of tuples (doc, score, index)
+        k_rrf: Constant parameters for RRF (usually 60)
+        
+    Returns:
+        List of dicts containing fused results.
+    """
+    rrf_scores = {}
+    
+    # Map ranks (1-based index)
+    sem_ranks = {item[2]: rank + 1 for rank, item in enumerate(semantic_results)}
+    key_ranks = {item[2]: rank + 1 for rank, item in enumerate(keyword_results)}
+    
+    all_indices = set(sem_ranks.keys()).union(set(key_ranks.keys()))
+    
+    for idx in all_indices:
+        sem_rank = sem_ranks.get(idx)
+        key_rank = key_ranks.get(idx)
+        
+        score = 0.0
+        if sem_rank is not None:
+            score += 1.0 / (k_rrf + sem_rank)
+        if key_rank is not None:
+            score += 1.0 / (k_rrf + key_rank)
+            
+        doc = semantic_results[sem_ranks[idx] - 1][0] if sem_rank is not None else keyword_results[key_ranks[idx] - 1][0]
+        
+        rrf_scores[idx] = {
+            "document": doc,
+            "rrf_score": score,
+            "index": idx,
+            "semantic_score": float(semantic_results[sem_ranks[idx] - 1][1]) if sem_rank is not None else 0.0,
+            "keyword_score": float(keyword_results[key_ranks[idx] - 1][1]) if key_rank is not None else 0.0,
+            "match_type": "hybrid" if (sem_rank and key_rank) else ("semantic" if sem_rank else "keyword")
+        }
+        
+    # Sort by RRF score descending
+    sorted_rrf = sorted(rrf_scores.values(), key=lambda x: x["rrf_score"], reverse=True)
+    return sorted_rrf
+
+def get_matching_keywords(query, document):
+    """Extract intersection of query and document terms, skipping common stop words."""
+    query_words = set(re.findall(r'[a-z0-9]+', query.lower()))
+    doc_words = set(re.findall(r'[a-z0-9]+', document.lower()))
+    shared = query_words.intersection(doc_words)
+    stopwords = {"the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "on", "for", "with", "is", "was", "it", "this", "that", "i", "you", "he", "she", "they", "we"}
+    return [word for word in shared if word not in stopwords]
+
 @app.get("/")
 async def root():
     """Simple API root check."""
     return {
-        "message": "VectorMind Semantic Search API",
+        "message": "VectorMind Intelligent Semantic Search & RAG API",
         "status": "running",
         "embedding_model": "loaded" if embedding_model else "not loaded",
-        "faiss_index": f"loaded ({len(faiss_index.documents)} docs)" if faiss_index else "not loaded"
+        "faiss_index": f"loaded ({len(faiss_index.documents)} docs)" if faiss_index else "not loaded",
+        "bm25_retriever": "ready" if bm25_retriever else "not ready",
+        "reranker": "ready" if reranker else "not ready",
+        "rag_generator": "ready" if rag_generator else "not ready"
     }
 
 @app.post("/query", response_model=QueryResponse)
 async def query_search(request: QueryRequest):
-    """Perform hybrid semantic-keyword search with cache checks and cluster detection."""
+    """Perform synonym-expanded hybrid search, RRF rank merging, Cross-Encoder reranking, and RAG answer generation."""
     start_time = time.time()
     
-    if not embedding_model or not faiss_index or not fuzzy_clustering:
+    if not embedding_model or not faiss_index or not fuzzy_clustering or not bm25_retriever or not reranker or not rag_generator:
         raise HTTPException(status_code=503, detail="System components not fully initialized")
         
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query string cannot be empty")
         
     try:
-        # Preprocess and intent classification
+        # 1. Query Expansion (synonym matching)
+        expanded_q = expand_query(request.query)
+        
+        # Preprocess query for vectors and classifier
         cleaned_query = clean_text(request.query)
         intent = detect_query_intent(request.query)
         
-        # Vector embedding generation
+        # 2. Vector embedding generation
         query_embedding = embedding_model.encode([cleaned_query])[0]
         
-        # Predict cluster probabilities
+        # Predict GMM cluster probabilities
         cluster_id, cluster_prob = fuzzy_clustering.get_dominant_cluster(query_embedding)
         
-        # Check cache
+        # 3. Check Semantic Cache
         cached_result, matched_query, cache_similarity = semantic_cache.get(query_embedding, query_cluster=cluster_id)
         if cached_result:
             processing_time = time.time() - start_time
+            # Record analytics log (latency = ~0 for cache hit)
+            if analytics_tracker:
+                analytics_tracker.record_query(request.query, cache_hit=True, latency=processing_time, cluster_id=cluster_id)
+                
             return QueryResponse(
                 query=request.query,
                 intent=intent,
@@ -193,92 +298,199 @@ async def query_search(request: QueryRequest):
                     document=cached_result,
                     similarity_score=float(cache_similarity),
                     cluster=cluster_id,
-                    match_type="cache"
+                    match_type="cache",
+                    explanation=f"Exact match fetched from semantic cache (matched query: '{matched_query}')"
                 )],
                 dominant_cluster=cluster_id,
                 cluster_probability=cluster_prob,
-                processing_time=round(processing_time, 4)
+                processing_time=round(processing_time, 4),
+                expanded_query=expanded_q,
+                sources=["Semantic Cache"]
             )
             
-        # 1. Semantic Search (FAISS)
-        semantic_results = faiss_index.search(query_embedding, k=max(20, request.top_k * 2))
-        semantic_dict = {doc: score for doc, score, idx in semantic_results}
+        # 4. Perform Candidate Retrieval (Hybrid Search)
+        # Fetch top 20 candidates from FAISS dense vector search
+        semantic_candidates = faiss_index.search(query_embedding, k=20)
         
-        # 2. Keyword Search (TF-IDF Cosine Similarity)
-        keyword_scores = {}
-        if tfidf_vectorizer and tfidf_matrix is not None:
-            query_tfidf = tfidf_vectorizer.transform([cleaned_query])
-            cosine_sims = (tfidf_matrix * query_tfidf.T).toarray().flatten()
-            top_k_indices = np.argsort(cosine_sims)[-request.top_k:][::-1]
-            for idx in top_k_indices:
-                if cosine_sims[idx] > 0.0:
-                    doc = faiss_index.documents[idx]
-                    keyword_scores[doc] = float(cosine_sims[idx])
+        # Fetch top 20 candidates from BM25 sparse keyword search using expanded query
+        keyword_candidates = bm25_retriever.search(expanded_q, k=20)
+        
+        # 5. Merge Candidate Lists via Reciprocal Rank Fusion (RRF)
+        fused_candidates = reciprocal_rank_fusion(semantic_candidates, keyword_candidates, k_rrf=60)
+        
+        # Slice the top 20 candidates for rerank processing
+        rerank_candidates = []
+        for c in fused_candidates[:20]:
+            rerank_candidates.append((c["document"], c["rrf_score"], c["index"]))
+            
+        # 6. Apply Cross-Encoder Reranking
+        reranked_docs = reranker.rerank(request.query, rerank_candidates, top_k=5)
+        
+        # 7. Generate Grounded RAG Answer
+        context_texts = [item["document"] for item in reranked_docs]
+        rag_answer, rag_sources = rag_generator.generate_answer(request.query, context_texts)
+        
+        # Save generated RAG answer to Semantic Cache for future acceleration
+        semantic_cache.set(query_embedding, request.query, rag_answer, cluster_id)
+        
+        # 8. Compile Search Explanations
+        final_results = []
+        for rank, item in enumerate(reranked_docs):
+            doc = item["document"]
+            idx = item["index"]
+            rerank_score = item["rerank_score"]
+            base_fused_score = item["base_score"]
+            
+            # Find the original match type and scores
+            orig_match = "hybrid"
+            sem_score = 0.0
+            key_score = 0.0
+            
+            for orig in fused_candidates:
+                if orig["index"] == idx:
+                    orig_match = orig["match_type"]
+                    sem_score = orig["semantic_score"]
+                    key_score = orig["keyword_score"]
+                    break
                     
-        # 3. Hybrid Rank Fusion (Linear Combination of normalized scores)
-        combined_scores = {}
-        all_docs = set(semantic_dict.keys()).union(set(keyword_scores.keys()))
-        
-        for doc in all_docs:
-            sem_score = semantic_dict.get(doc, 0.0)
-            key_score = keyword_scores.get(doc, 0.0)
+            # Compute matching keyword overlaps
+            matching_terms = get_matching_keywords(request.query, doc)
             
-            if request.hybrid:
-                # Combined score calculation
-                score = request.alpha * sem_score + (1.0 - request.alpha) * key_score
-                match_type = "hybrid"
-            else:
-                score = sem_score
-                match_type = "semantic"
-                
-            combined_scores[doc] = (score, match_type)
+            # Form explanation text
+            explanation = (
+                f"Ranked #{rank+1} after Cross-Encoder reranking (score: {round(rerank_score, 2)}). "
+                f"Initially matched via {orig_match.upper()} search. "
+                f"Keyword Overlaps: {', '.join(matching_terms) if matching_terms else 'None'}. "
+                f"Semantic Cosine: {round(sem_score * 100, 1)}% | BM25 Score: {round(key_score, 1)}."
+            )
             
-        # Rank by score
-        ranked_docs = sorted(combined_scores.items(), key=lambda x: x[1][0], reverse=True)[:request.top_k]
-        
-        results_list = []
-        for doc, (score, m_type) in ranked_docs:
-            results_list.append(SearchResultItem(
+            # Predict cluster for this document
+            doc_embedding = embedding_model.encode([doc])[0]
+            doc_cluster, _ = fuzzy_clustering.get_dominant_cluster(doc_embedding)
+            
+            final_results.append(SearchResultItem(
                 document=doc,
-                similarity_score=score,
-                cluster=cluster_id,
-                match_type=m_type
+                similarity_score=rerank_score,
+                cluster=doc_cluster,
+                match_type="reranked",
+                semantic_score=sem_score,
+                keyword_score=key_score,
+                rrf_score=base_fused_score,
+                explanation=explanation,
+                index=idx
             ))
             
-        # If no results matched, fall back to pure semantic top-K or default
-        if not results_list and semantic_results:
-            for doc, score, idx in semantic_results[:request.top_k]:
-                results_list.append(SearchResultItem(
-                    document=doc,
-                    similarity_score=score,
-                    cluster=cluster_id,
-                    match_type="semantic"
-                ))
-                
-        # Generate summary
-        results_raw = [{"document": item.document} for item in results_list]
-        summary = generate_summary(results_raw) if results_raw else f"No results found for '{request.query}'."
-        
-        # Save to Cache
-        semantic_cache.set(query_embedding, request.query, summary, cluster_id)
-        
         processing_time = time.time() - start_time
-        top_score = results_list[0].similarity_score if results_list else 0.0
+        top_score = final_results[0].similarity_score if final_results else 0.0
         
+        # 9. Record Analytics Telemetry
+        if analytics_tracker:
+            analytics_tracker.record_query(request.query, cache_hit=False, latency=processing_time, cluster_id=cluster_id)
+            
         return QueryResponse(
             query=request.query,
             intent=intent,
             cache_hit=False,
             matched_query=None,
             similarity_score=float(top_score),
-            result=summary,
-            results=results_list,
+            result=rag_answer,
+            results=final_results,
             dominant_cluster=cluster_id,
             cluster_probability=cluster_prob,
-            processing_time=round(processing_time, 4)
+            processing_time=round(processing_time, 4),
+            expanded_query=expanded_q,
+            sources=rag_sources
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Query execution error: {str(e)}")
+
+@app.get("/analytics")
+async def get_analytics_dashboard():
+    """Return dashboard analytics telemetry."""
+    if not analytics_tracker:
+        raise HTTPException(status_code=503, detail="Analytics component not initialized")
+    return analytics_tracker.get_analytics()
+
+@app.post("/reindex")
+async def rebuild_search_index():
+    """Trigger complete document reindexing and GMM model fit."""
+    try:
+        build_and_persist_index()
+        fit_tfidf_search()
+        return {"status": "success", "message": "Search index and clustering models successfully rebuilt."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reindexing failed: {str(e)}")
+
+@app.get("/evaluate")
+async def run_system_evaluation(k: int = Query(5, description="Evaluation threshold parameter")):
+    """Run standard IR precision, recall, MRR, and NDCG benchmark tests."""
+    if not faiss_index or not faiss_index.documents:
+        raise HTTPException(status_code=503, detail="Search documents index not loaded")
+        
+    def evaluation_search_pipeline(query_string: str):
+        # Mini search pipeline for evaluation matching
+        query_embedding = embedding_model.encode([query_string])[0]
+        semantic_candidates = faiss_index.search(query_embedding, k=20)
+        expanded_q = expand_query(query_string)
+        keyword_candidates = bm25_retriever.search(expanded_q, k=20)
+        fused = reciprocal_rank_fusion(semantic_candidates, keyword_candidates, k_rrf=60)
+        rerank_candidates = [(item["document"], item["rrf_score"], item["index"]) for item in fused[:20]]
+        reranked = reranker.rerank(query_string, rerank_candidates, top_k=k)
+        return reranked
+        
+    try:
+        report = evaluate_system(faiss_index.documents, evaluation_search_pipeline, k=k)
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
+
+@app.get("/clusters/visualization")
+async def get_clusters_visualization():
+    """Generate 2D t-SNE coordinate projections for interactive frontend topic mapping."""
+    if not faiss_index or not faiss_index.documents or not embedding_model or not fuzzy_clustering:
+        raise HTTPException(status_code=503, detail="System components not fully loaded")
+        
+    try:
+        from sklearn.manifold import TSNE
+        documents = faiss_index.documents
+        
+        # Generate dense embeddings
+        embeddings = embedding_model.encode(documents)
+        
+        # Fit t-SNE projection to 2D space
+        perplexity_val = min(30, max(5, len(documents) // 5))
+        try:
+            tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity_val, max_iter=1000)
+        except TypeError:
+            tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity_val, n_iter=1000)
+        embeddings_2d = tsne.fit_transform(embeddings)
+        
+        # Calculate cluster memberships
+        memberships = fuzzy_clustering.predict_proba(embeddings)
+        dominant_clusters = np.argmax(memberships, axis=1)
+        
+        points = []
+        for idx, (x, y) in enumerate(embeddings_2d):
+            # Clean snippet for easy JSON rendering
+            snippet = documents[idx][:120].strip().replace("\n", " ")
+            if len(documents[idx]) > 120:
+                snippet += "..."
+                
+            points.append({
+                "id": idx,
+                "x": round(float(x), 4),
+                "y": round(float(y), 4),
+                "document": snippet,
+                "cluster": int(dominant_clusters[idx]),
+                "probability": round(float(memberships[idx][dominant_clusters[idx]]), 4)
+            })
+            
+        return {
+            "n_documents": len(documents),
+            "points": points
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"t-SNE projection failed: {str(e)}")
 
 @app.get("/cache/stats")
 async def get_cache_stats():
@@ -347,5 +559,8 @@ async def health_check():
         "embedding_model": "ready" if embedding_model else "not ready",
         "cache": "ready" if semantic_cache else "not ready",
         "vector_index": "ready" if faiss_index else "not ready",
-        "clustering": "ready" if fuzzy_clustering else "not ready"
+        "clustering": "ready" if fuzzy_clustering else "not ready",
+        "bm25": "ready" if bm25_retriever else "not ready",
+        "reranker": "ready" if reranker else "not ready",
+        "rag": "ready" if rag_generator else "not ready"
     }
