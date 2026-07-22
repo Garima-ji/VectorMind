@@ -8,6 +8,8 @@ CACHE_SIMILARITY_THRESHOLD = 0.95
 
 # Search configuration
 TOP_K_RESULTS = 5
+TOP_K_MIN = 1
+TOP_K_MAX = 100
 
 # Persistence configuration
 INDEX_PATH = "backend/data/index_store/faiss_index.bin"
@@ -20,5 +22,3 @@ n_clusters = 5  # Standard GMM cluster components
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 GENERATOR_MODEL = "google/flan-t5-small"
 HF_API_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
-
-
