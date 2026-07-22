@@ -148,8 +148,8 @@ async def startup_event():
         
         log_info("VectorMind API initialization completed. Server is READY!")
     except Exception as e:
-        log_info(f"Startup error: {e}")
-        pass
+        log_info(f"CRITICAL: Startup failed: {e}")
+        raise
 
 def build_and_persist_index():
     """Build and fit the index/model from raw dataset, then persist them."""
@@ -192,6 +192,8 @@ def reciprocal_rank_fusion(semantic_results, keyword_results, k_rrf=60):
     """
     Reciprocal Rank Fusion (RRF) to merge semantic and keyword search ranks.
     
+    Fixed to avoid index corruption by using clean lookup maps instead of re-indexing.
+    
     Args:
         semantic_results: List of tuples (doc, score, index)
         keyword_results: List of tuples (doc, score, index)
@@ -201,6 +203,12 @@ def reciprocal_rank_fusion(semantic_results, keyword_results, k_rrf=60):
         List of dicts containing fused results.
     """
     rrf_scores = {}
+    
+    # Build clean index → document and index → score maps to avoid re-indexing errors
+    sem_docs = {item[2]: item[0] for item in semantic_results}
+    key_docs = {item[2]: item[0] for item in keyword_results}
+    sem_scores = {item[2]: item[1] for item in semantic_results}
+    key_scores = {item[2]: item[1] for item in keyword_results}
     
     # Map ranks (1-based index)
     sem_ranks = {item[2]: rank + 1 for rank, item in enumerate(semantic_results)}
@@ -217,15 +225,16 @@ def reciprocal_rank_fusion(semantic_results, keyword_results, k_rrf=60):
             score += 1.0 / (k_rrf + sem_rank)
         if key_rank is not None:
             score += 1.0 / (k_rrf + key_rank)
-            
-        doc = semantic_results[sem_ranks[idx] - 1][0] if sem_rank is not None else keyword_results[key_ranks[idx] - 1][0]
+        
+        # Use clean lookup maps instead of re-indexing
+        doc = sem_docs.get(idx) or key_docs.get(idx)
         
         rrf_scores[idx] = {
             "document": doc,
             "rrf_score": score,
             "index": idx,
-            "semantic_score": float(semantic_results[sem_ranks[idx] - 1][1]) if sem_rank is not None else 0.0,
-            "keyword_score": float(keyword_results[key_ranks[idx] - 1][1]) if key_rank is not None else 0.0,
+            "semantic_score": float(sem_scores.get(idx, 0.0)),
+            "keyword_score": float(key_scores.get(idx, 0.0)),
             "match_type": "hybrid" if (sem_rank and key_rank) else ("semantic" if sem_rank else "keyword")
         }
         
@@ -264,6 +273,10 @@ async def query_search(request: QueryRequest):
         
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query string cannot be empty")
+    
+    # Validate and constrain top_k
+    top_k = request.top_k or config.TOP_K_RESULTS
+    top_k = max(config.TOP_K_MIN, min(top_k, config.TOP_K_MAX))
         
     try:
         # 1. Query Expansion (synonym matching)
@@ -324,7 +337,7 @@ async def query_search(request: QueryRequest):
             rerank_candidates.append((c["document"], c["rrf_score"], c["index"]))
             
         # 6. Apply Cross-Encoder Reranking
-        reranked_docs = reranker.rerank(request.query, rerank_candidates, top_k=5)
+        reranked_docs = reranker.rerank(request.query, rerank_candidates, top_k=top_k)
         
         # 7. Generate Grounded RAG Answer
         context_texts = [item["document"] for item in reranked_docs]
