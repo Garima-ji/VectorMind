@@ -21,4 +21,7 @@ RUN python -c "from sklearn.datasets import fetch_20newsgroups; fetch_20newsgrou
 
 COPY . .
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
+
 CMD uvicorn backend.api.main:app --host 0.0.0.0 --port 7860
