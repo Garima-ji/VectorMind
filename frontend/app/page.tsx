@@ -4,10 +4,15 @@ import { useState, useEffect, useRef } from "react"
 import { 
   Search, Zap, BarChart2, Settings, AlertCircle, Map, Play, 
   CheckCircle, RefreshCw, Sliders, Database, TrendingUp, 
-  History, BookOpen, Cpu, Info, ArrowRight, ExternalLink
+  History, BookOpen, Cpu, Info, ArrowRight, ExternalLink,
+  Brain, Clock, Sun, Moon, Rocket, Shield, Activity, Trophy
 } from "lucide-react"
+import { useTheme } from "next-themes"
 
 export default function Home() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
   // Navigation
   const [activeTab, setActiveTab] = useState<"search" | "clusters" | "analytics" | "evaluation">("search")
   
@@ -62,14 +67,15 @@ export default function Home() {
   ]
 
   const trendingTopics = [
-    { emoji: "🚀", label: "Space Exploration", query: "space exploration missions" },
-    { emoji: "🔐", label: "Cryptography", query: "cryptography key encryption" },
-    { emoji: "🏥", label: "Cancer Treatment", query: "medical cancer disease treatment" },
-    { emoji: "🏒", label: "Hockey Playoffs", query: "nhl game hockey team" }
+    { icon: Rocket, label: "Space Exploration", query: "space exploration missions" },
+    { icon: Shield, label: "Cryptography", query: "cryptography key encryption" },
+    { icon: Activity, label: "Cancer Treatment", query: "medical cancer disease treatment" },
+    { icon: Trophy, label: "Hockey Playoffs", query: "nhl game hockey team" }
   ]
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
+    setMounted(true)
     const saved = localStorage.getItem("vectormind_recent_searches")
     if (saved) {
       try {
@@ -321,53 +327,65 @@ export default function Home() {
       <nav className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-3xl text-orange-500 animate-pulse">⚡</span>
+            <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl text-indigo-600 dark:text-indigo-400">
+              <Zap className="h-5 w-5 animate-pulse" />
+            </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">
               VectorMind <span className="text-xs font-semibold px-2 py-0.5 border border-indigo-400/30 rounded-full text-indigo-500 ml-1">v2.0 RAG</span>
             </span>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+          {/* Navigation Tabs & Theme Toggle */}
+          <div className="flex items-center gap-3.5">
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+              <button
+                onClick={() => setActiveTab("search")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === "search" 
+                    ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
+              >
+                <Search className="h-4 w-4" /> Search & RAG
+              </button>
+              <button
+                onClick={() => setActiveTab("clusters")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === "clusters" 
+                    ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
+              >
+                <Map className="h-4 w-4" /> Cluster Map
+              </button>
+              <button
+                onClick={() => setActiveTab("analytics")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === "analytics" 
+                    ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
+              >
+                <BarChart2 className="h-4 w-4" /> Analytics
+              </button>
+              <button
+                onClick={() => setActiveTab("evaluation")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  activeTab === "evaluation" 
+                    ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
+              >
+                <Cpu className="h-4 w-4" /> Benchmarks
+              </button>
+            </div>
+
             <button
-              onClick={() => setActiveTab("search")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === "search" 
-                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-all border border-transparent hover:border-gray-250 dark:hover:border-gray-700 h-9 w-9 flex items-center justify-center"
+              aria-label="Toggle theme"
             >
-              <Search className="h-4 w-4" /> Search & RAG
-            </button>
-            <button
-              onClick={() => setActiveTab("clusters")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === "clusters" 
-                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
-            >
-              <Map className="h-4 w-4" /> Cluster Map
-            </button>
-            <button
-              onClick={() => setActiveTab("analytics")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === "analytics" 
-                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
-            >
-              <BarChart2 className="h-4 w-4" /> Analytics
-            </button>
-            <button
-              onClick={() => setActiveTab("evaluation")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === "evaluation" 
-                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
-            >
-              <Cpu className="h-4 w-4" /> Benchmarks
+              {mounted && theme === "dark" ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
             </button>
           </div>
         </div>
@@ -452,15 +470,18 @@ export default function Home() {
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Trending Topics</p>
                     <div className="flex flex-wrap gap-2">
-                      {trendingTopics.map((t, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleSearch(t.query)}
-                          className="text-xs bg-gray-150 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 px-3.5 py-1.5 rounded-lg font-semibold border border-transparent hover:border-indigo-500/20 transition-all flex items-center gap-1.5"
-                        >
-                          <span>{t.emoji}</span> {t.label}
-                        </button>
-                      ))}
+                      {trendingTopics.map((t, idx) => {
+                        const IconComponent = t.icon
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleSearch(t.query)}
+                            className="text-xs bg-gray-150 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600 px-3.5 py-1.5 rounded-lg font-semibold border border-transparent hover:border-indigo-500/20 transition-all flex items-center gap-1.5"
+                          >
+                            <IconComponent className="h-3.5 w-3.5 text-indigo-500" /> {t.label}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
@@ -504,8 +525,8 @@ export default function Home() {
 
                 {/* Grounded LLM Response */}
                 <div className="bg-gradient-to-tr from-indigo-500/5 to-purple-500/5 dark:from-indigo-950/20 dark:to-purple-950/20 border-2 border-indigo-500/20 rounded-3xl p-8 shadow-lg relative overflow-hidden">
-                  <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-5 pointer-events-none select-none">
-                    <span className="text-9xl">🧠</span>
+                  <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-5 text-indigo-600 dark:text-indigo-400 pointer-events-none select-none">
+                    <Brain className="h-48 w-48" />
                   </div>
 
                   <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
@@ -702,8 +723,8 @@ export default function Home() {
                 {/* Metric Summary Widgets */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex items-center gap-5">
-                    <div className="h-12 w-12 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center text-2xl">
-                      🔍
+                    <div className="h-12 w-12 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
+                      <Search className="h-6 w-6" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Queries</p>
@@ -712,8 +733,8 @@ export default function Home() {
                   </div>
 
                   <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex items-center gap-5">
-                    <div className="h-12 w-12 bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center text-2xl">
-                      💾
+                    <div className="h-12 w-12 bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-xl flex items-center justify-center">
+                      <Database className="h-6 w-6" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Cache Hit Rate</p>
@@ -722,8 +743,8 @@ export default function Home() {
                   </div>
 
                   <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex items-center gap-5">
-                    <div className="h-12 w-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center text-2xl">
-                      ⏰
+                    <div className="h-12 w-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
+                      <Clock className="h-6 w-6" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Average Latency</p>

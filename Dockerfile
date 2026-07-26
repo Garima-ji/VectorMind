@@ -1,25 +1,27 @@
 FROM python:3.10-slim
 
-WORKDIR /app
+# Create a non-root user (UID 1000) as required by Hugging Face Spaces
+RUN useradd -m -u 1000 user
+
+# Set up working directory inside the user's home
+WORKDIR /home/user/app
 
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download SentenceTransformer model to cache in Docker layer
+# Switch to the non-root user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+# Pre-download models inside the user's home directory cache so they are available at runtime
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-
-# Pre-download Cross-Encoder reranker model to cache in Docker layer
 RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"
-
-# Pre-download generator model to cache in Docker layer
 RUN python -c "from transformers import pipeline; pipeline('text2text-generation', model='google/flan-t5-small')"
-
-# Pre-download scikit-learn newsgroups dataset to cache in Docker layer
 RUN python -c "from sklearn.datasets import fetch_20newsgroups; fetch_20newsgroups(subset='train')"
 
-
-COPY . .
+# Copy project files with ownership set to the non-root user
+COPY --chown=user . .
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
