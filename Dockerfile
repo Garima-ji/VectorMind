@@ -5,6 +5,7 @@ RUN useradd -m -u 1000 user
 
 # Set up working directory inside the user's home
 WORKDIR /home/user/app
+RUN chown -R user:user /home/user/app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -24,6 +25,6 @@ RUN python -c "from sklearn.datasets import fetch_20newsgroups; fetch_20newsgrou
 COPY --chown=user . .
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:7860/')" || exit 1
 
 CMD uvicorn backend.api.main:app --host 0.0.0.0 --port 7860
