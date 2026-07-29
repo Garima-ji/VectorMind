@@ -38,7 +38,9 @@ VectorMind implements all four core components requested in the specifications:
 Exposes clean REST endpoints on port **8000**:
 * `POST /query`: Accepts a query, checks the cluster-aware semantic cache, falls back to a hybrid FAISS+BM25 and Cross-Encoder reranker on a cache miss, and generates grounded RAG answers.
 * `GET /cache/stats`: Returns cache metrics (`total_entries`, `hit_count`, `miss_count`, `hit_rate`).
-* `DELETE /cache`: Resets and flushes all cache entries and statistics.
+* `DELETE /cache`: Resets and flushes all cache entries and statistics (requires `X-Admin-Token` header).
+* `GET /reindex/status`: Check progress of background index jobs.
+* `/ui/`: Serves the integrated static frontend dashboard directly from uvicorn, unifying backend and frontend on a single port.
 
 ---
 
@@ -89,19 +91,13 @@ VectorMind
    python -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000
    ```
 
-### 2. Run the Next.js Frontend (Optional)
+### 2. View the Integrated UI Dashboard (No Node.js process needed!)
 
-1. **Navigate to the frontend folder**:
-   ```bash
-   cd frontend
-   ```
+Since Next.js is compiled and served statically from FastAPI:
+1. Open the local address: `http://localhost:8000/ui/` in your browser.
+2. The UI dashboard runs immediately, fetching queries and metrics directly.
 
-2. **Install frontend dependencies & run development server**:
-   ```bash
-   npm install
-   npm run dev
-   ```
-   Open the dashboard UI at `http://localhost:3000`.
+*(Optional Development Mode: Navigate to `cd frontend`, run `npm install && npm run dev` to start hot-reloading dev mode on `http://localhost:3000`).*
 
 ---
 
