@@ -1,12 +1,12 @@
 {
-  "total_queries": 6,
-  "cache_hits": 3,
-  "total_latency": 481.4875545501709,
+  "total_queries": 8,
+  "cache_hits": 4,
+  "total_latency": 539.3635008335114,
   "query_terms": {
-    "machine learning algorithms": 6
+    "machine learning algorithms": 8
   },
   "cluster_hits": {
-    "3": 6
+    "3": 8
   },
   "latencies": [
     163.57112193107605,
@@ -14,6 +14,8 @@
     280.0273859500885,
     0.039376258850097656,
     37.76501774787903,
-    0.03815746307373047
+    0.03815746307373047,
+    57.85065412521362,
+    0.025292158126831055
   ]
 }

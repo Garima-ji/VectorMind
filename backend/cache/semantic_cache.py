@@ -9,6 +9,25 @@ class SemanticCache:
         """
         Initialize semantic cache.
         
+        EXPLORATION OF THE TUNABLE SIMILARITY THRESHOLD PARAMETER:
+        The `similarity_threshold` is the core tunable parameter of the semantic cache system.
+        It defines the boundary for deciding whether a new query is semantically "close enough"
+        to a cached query to reuse its result.
+        
+        Key trade-offs of this parameter:
+        1. High values (e.g., 0.98 - 1.00):
+           - Acts like an exact match cache. 
+           - High precision: Almost zero chance of a false cache hit.
+           - Low recall: Misses opportunities to accelerate queries that differ only by minor
+             synonyms, word ordering, or punctuation.
+        2. Low values (e.g., 0.80 - 0.90):
+           - High recall: Accelerates a large number of query variants.
+           - Low precision: High risk of false cache hits, returning answers that might be about 
+             the same general topic (same cluster) but fail to answer the user's specific query.
+        3. Configured default (0.95):
+           - Empirically selected. It safely filters out semantically distinct queries while 
+             consistently hitting for rephrased inputs or inputs with interchangeable synonyms.
+        
         Args:
             similarity_threshold: Minimum similarity for cache hit
         """

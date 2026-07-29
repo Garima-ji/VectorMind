@@ -555,11 +555,12 @@ async def get_clusters():
         analysis = analyze_clusters(documents, memberships, fuzzy_clustering.n_clusters)
         
         # Convert keys to string JSON serialization compatibility
-        formatted_analysis = {str(k): v for k, v in analysis.items()}
+        formatted_analysis = {str(k): v for k, v in analysis["representative_docs"].items()}
         
         return {
             "n_clusters": fuzzy_clustering.n_clusters,
-            "clusters": formatted_analysis
+            "clusters": formatted_analysis,
+            "boundary_cases": analysis["boundary_cases"]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate cluster analysis: {str(e)}")
