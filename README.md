@@ -4,122 +4,128 @@ emoji: 🧠
 colorFrom: indigo
 colorTo: purple
 sdk: docker
-app_port: 7860
+app_port: 8000
 ---
 
-# VectorMind: Intelligent Retrieval & RAG Platform
+# VectorMind: Intelligent Semantic Search, Cache & RAG Platform
 
-VectorMind is a production-grade, portfolio-quality intelligent retrieval and RAG search platform. It merges dense vector retrieval with sparse keyword matching (BM25), reciprocal rank fusion (RRF), Cross-Encoder reranking, and grounded Retrieval-Augmented Generation (RAG) to upgrade traditional semantic search systems.
+VectorMind is a production-grade, portfolio-quality intelligent retrieval and RAG search platform. It is fully aligned with the **Trademarkia - AI&ML Engineer Task** specifications, implementing semantic search over the **20 Newsgroups corpus** using FAISS, a Gaussian Mixture Model (GMM) fuzzy clustering layer, and a custom cluster-aware semantic cache built from first principles.
 
-The platform includes real-time topic clustering visualizations (t-SNE), system telemetry analytics, and standard Information Retrieval (IR) benchmarking dashboards.
-
----
-
-## Architecture Overview
-
-VectorMind implements a multi-stage hybrid search pipeline to deliver highly accurate, contextual search results and grounded answers:
-
-1. **Query Processing & Expansion**: Input queries are cleaned and expanded with technical and scientific synonyms to bridge the vocabulary gap.
-2. **Hybrid Search (Sparse + Dense)**:
-   * **Semantic Search (Dense)**: Computes dense sentence embeddings using SentenceTransformers (`all-MiniLM-L6-v2`) and retrieves candidates via a FAISS vector index.
-   * **Keyword Search (Sparse)**: Evaluates query token matches using an optimized Okapi BM25 index over the corpus.
-3. **Reciprocal Rank Fusion (RRF)**: Merges dense and sparse candidates by rank to combine lexical and semantic matching capabilities.
-4. **Cross-Encoder Reranking**: Re-evaluates the top candidates with `cross-encoder/ms-marco-MiniLM-L-6-v2` to return the most relevant documents.
-5. **Grounded Generation**: Generates contextual answers based strictly on the retrieved document contexts using Hugging Face's serverless inference APIs (falling back to a local `google/flan-t5-small` model offline).
+The platform also includes a Next.js web application for real-time topic visualizations (t-SNE coordinates), telemetry analytics, and standard Information Retrieval (IR) benchmarking dashboards.
 
 ---
 
-## Directory Structure
+## 🚀 Trademarkia Assignment Architecture
+
+VectorMind implements all four core components requested in the specifications:
+
+### 1. Preprocessing & FAISS Vector DB (Part 1)
+* **Pre-processing**: Noisy headers, quoting replies, and signatures are stripped using scikit-learn standard filters to keep search focused on pure message body semantics.
+* **Embeddings**: Text is encoded into 384-dimensional dense vectors using the SentenceTransformers `all-MiniLM-L6-v2` model.
+* **Vector Index**: Uses a **FAISS** (Facebook AI Similarity Search) FlatIP index for fast cosine similarity lookups, backed by a zero-dependency **NumPy fallback** for environment flexibility.
+
+### 2. GMM Fuzzy Clustering & Boundary Analysis (Part 2)
+* **Soft Assignment**: Implements a Gaussian Mixture Model (GMM) clustering layer. Instead of hard categorizing, it returns a probability distribution mapping documents to multiple overlapping topics.
+* **Number of Clusters**: Configured to **20 clusters** to naturally capture the 20 newsgroups categories.
+* **Boundary Analysis**: Dynamically extracts boundary/uncertain documents—specifically locating items where the probability gap between the top two assigned clusters is lowest.
+
+### 3. Custom Semantic Cache (Part 3)
+* **First Principles**: Built entirely using NumPy and scikit-learn cosine similarity (without Redis, Memcached, or external caching middleware).
+* **Cluster-Aware Lookups**: Groups cache entries using their GMM dominant cluster. When a new query is run, the cache only searches entries in the matching cluster, preventing search latencies from scaling as the cache grows.
+* **Tunable Parameter**: Employs a similarity threshold of `0.95`, balancing search accuracy (precision) against query acceleration (recall).
+
+### 4. FastAPI Service & State Management (Part 4)
+Exposes clean REST endpoints on port **8000**:
+* `POST /query`: Accepts a query, checks the cluster-aware semantic cache, falls back to a hybrid FAISS+BM25 and Cross-Encoder reranker on a cache miss, and generates grounded RAG answers.
+* `GET /cache/stats`: Returns cache metrics (`total_entries`, `hit_count`, `miss_count`, `hit_rate`).
+* `DELETE /cache`: Resets and flushes all cache entries and statistics.
+
+---
+
+## 📂 Directory Structure
 
 ```
 VectorMind
 ├── backend
-│   ├── api                  # FastAPI web server and endpoints
-│   ├── cache                # Semantic cache for query acceleration
-│   ├── clustering           # GMM topic clustering models
-│   ├── data                 # Persisted indices, analytics, and data loader
-│   ├── embeddings           # Dense vector models and Cross-Encoder rerankers
-│   ├── preprocessing        # Text normalization and preprocessing pipelines
-│   └── utils                # Evaluation metrics, configuration, and generator
-├── docs                     # Technical documentation and deployment guides
+│   ├── api                  # FastAPI web server, routes, and endpoints
+│   ├── cache                # Semantic cache and cluster filtering logic
+│   ├── clustering           # GMM clustering models and fitting pipelines
+│   ├── data                 # Analytics store, data loaders, and saved indices
+│   ├── embeddings           # SentenceTransformer and Cross-Encoder models
+│   ├── preprocessing        # Text cleaners and newsgroup stripping filters
+│   └── utils                # Analytics, config, and generator utilities
 ├── frontend
-│   ├── app                  # Next.js dashboard UI
+│   ├── app                  # Next.js UI dashboard
 │   ├── components           # React UI components
 │   └── styles               # CSS theme styling
-├── tests                    # System verification and API test scripts
-├── Dockerfile               # Hugging Face Spaces Docker build configuration
-├── requirements.txt         # Python dependencies
-└── railway.json             # Infrastructure configuration
+├── tests                    # Startup and API verification scripts
+├── Dockerfile               # Port 8000 production container build
+├── requirements.txt         # Python backend dependencies
+└── README.md                # General system documentation
 ```
 
 ---
 
-## Installation & Startup
+## 🛠️ Quick Start & Local Run
 
 ### Prerequisites
 * Python 3.10 or higher
-* Node.js 18 or higher (for the frontend)
+* Node.js 18 or higher (only if using the Next.js UI dashboard)
 
-### 1. Run the Backend Locally
+### 1. Run the FastAPI Backend
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Garima-ji/VectorMind.git
-   cd VectorMind
-   ```
-
-2. **Install dependencies:**
+1. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Verify startup configuration:**
+2. **Verify Startup Configuration**:
    ```bash
    python tests/verify_startup.py
    ```
 
-4. **Start the FastAPI backend server:**
+3. **Start the Uvicorn Server**:
    ```bash
    python -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000
    ```
 
-### 2. Run the Frontend Locally
+### 2. Run the Next.js Frontend (Optional)
 
-1. **Navigate to the frontend folder:**
+1. **Navigate to the frontend folder**:
    ```bash
    cd frontend
    ```
 
-2. **Install frontend dependencies:**
+2. **Install frontend dependencies & run development server**:
    ```bash
    npm install
-   ```
-
-3. **Configure environment variables:**
-   Create a `.env.local` file in the `frontend` folder:
-   ```env
-   NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
-   ```
-
-4. **Start the Next.js development server:**
-   ```bash
    npm run dev
+   ```
+   Open the dashboard UI at `http://localhost:3000`.
+
+---
+
+## 🐳 Docker Deployment (Port 8000)
+
+VectorMind is containerized and configured to start on port **8000**:
+
+1. **Build the container image**:
+   ```bash
+   docker build -t vectormind:latest .
+   ```
+
+2. **Run the container**:
+   ```bash
+   docker run -p 8000:8000 vectormind:latest
    ```
 
 ---
 
-## Running Tests
+## 🧪 Testing the Pipeline
 
-Verify API endpoints using the testing suite:
+To run the API validation suite and trigger index rebuilding over the full 20 Newsgroups corpus:
+
 ```bash
 python tests/test_api.py
 ```
-
----
-
-## Production Deployment
-
-This project is pre-configured for dual-service deployment:
-
-* **Backend (Hugging Face Spaces)**: Built using the root [Dockerfile](Dockerfile). Set the SDK to **Docker** in Hugging Face and configure the container port to `7860`.
-* **Frontend (Vercel)**: Point your Vercel deployment to the `frontend` directory. Add the environment variable `NEXT_PUBLIC_API_URL` set to your Hugging Face Space URL (e.g. `https://<username>-<space-name>.hf.space`).
+This script validates health routes, checks caching thresholds, retrieves cluster distributions, evaluates system precision/NDCG metrics, and invokes the `/reindex` pipeline.
