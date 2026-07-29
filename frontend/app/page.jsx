@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && window.location.port === "3000" ? "http://127.0.0.1:8000" : "");
+
 export default function Home() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -161,7 +163,6 @@ export default function Home() {
     saveRecentSearch(queryToSearch);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${apiUrl}/query`, {
         method: "POST",
         headers: {
@@ -199,7 +200,6 @@ export default function Home() {
   const fetchClusterPoints = async () => {
     setClusterLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const res = await fetch(`${apiUrl}/clusters/visualization`);
       const data = await res.json();
       setClusterPoints(data.points || []);
@@ -214,7 +214,6 @@ export default function Home() {
   const fetchAnalytics = async () => {
     setAnalyticsLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const res = await fetch(`${apiUrl}/analytics`);
       const data = await res.json();
       setAnalyticsData(data);
@@ -229,7 +228,6 @@ export default function Home() {
   const runEvaluation = async (kVal = evalK) => {
     setEvaluationLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const res = await fetch(`${apiUrl}/evaluate?k=${kVal}`);
       const data = await res.json();
       setEvaluationReport(data);
@@ -245,8 +243,12 @@ export default function Home() {
     setReindexing(true);
     setReindexSuccess(false);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(`${apiUrl}/reindex`, { method: "POST" });
+      const res = await fetch(`${apiUrl}/reindex`, {
+        method: "POST",
+        headers: {
+          "X-Admin-Token": "vectormind_admin_secret"
+        }
+      });
       if (res.ok) {
         setReindexSuccess(true);
         // Refresh visualization and stats

@@ -1,0 +1,167 @@
+{
+  "n_clusters": 5,
+  "clusters": {
+    "0": [
+      {
+        "document": "Ah, yes, the big chunks down in the sump. The solution is simple. Sort of\nlike the advice my Aunt always gave -- never scratch your ear with anything\nexcept your elbow....",
+        "probability": 1.0
+      },
+      {
+        "document": ": \tDoes anybody out there know how the hand held breathalyzer used\n: by our police works?  I would like to hear about this and the more\n: general problem of detecting smells by machine.\n: \n: Thanks, W...",
+        "probability": 1.0
+      },
+      {
+        "document": "Maybe...then again did you get rid of that H/D of yorn and buy a rice rocket \nof your own?  That would certainly explain the friendliness...unless you \nmaybe had a piece of toilet paper stuck on the b...",
+        "probability": 1.0
+      }
+    ],
+    "1": [
+      {
+        "document": "\nIs VLB busmastering bad because it stops the processor fetching from\nexternal cache as well as main memory while the VLB card has the bus?\nHow significant is the slowing effect?\n...",
+        "probability": 1.0
+      },
+      {
+        "document": "I've had the board for over a year, and it does work with Diskdoubler,\nbut not with Autodoubler, due to a licensing problem with Stac Technologies,\nthe owners of the board's compression technology. (I...",
+        "probability": 1.0
+      },
+      {
+        "document": "I have win 3.0 and downloaded several icons and BMP's but I can't figure out\nhow to change the \"wallpaper\" or use the icons.  Any help would be appreciated.\n\n\nThanx,\n\n-Brando...",
+        "probability": 1.0
+      }
+    ],
+    "2": [
+      {
+        "document": "I would like to get your opinions on this: when exactly does an engaged\ncouple become \"married\" in God's eyes?  Some say that if the two have\npublically announced their plans to marry, have made their...",
+        "probability": 1.0
+      },
+      {
+        "document": "I don't think we need to argue about this.\n\n\nYes, but also many people who are not trying to make government recognize\nChristianity as the dominant religion in this country do no think\nthe motto infri...",
+        "probability": 1.0
+      },
+      {
+        "document": "It didn't happen.\n\nObviously.  You are an authority worshiper.\n\n\nGive me a camera, and time with you, and I can present excerpts that show you  \nto be a cult leader.  Guarenteed. You should at least v...",
+        "probability": 1.0
+      }
+    ],
+    "3": [
+      {
+        "document": "The Red Sox usually have 2 catchers.  I don't think they have a backup now,\nbut they used to use Randy Kutcher as a backup catcher, as well as a middle\ninfielder and outfielder.  You don't need a good...",
+        "probability": 1.0
+      },
+      {
+        "document": "Buck Showalter just can't win. \n\nBob Wickman's pitching the game of his life through eight innings (Yanks\nlead 6-1), so Buck decides to let the kid try and get his first complete\ngame. Wickman manages...",
+        "probability": 1.0
+      },
+      {
+        "document": "But ultimately their hockey philosophies are like night and day...\nKeenan believes in pressuring the opposition and taking the\ninitiative (within the limits of his system)...while Roger\nhas a reactive...",
+        "probability": 1.0
+      }
+    ],
+    "4": [
+      {
+        "document": "Apparently not.\n\nIn response to his claim that it \"terrifies\" gay people not to be able\nto \"indoctrinate children to our lifestyle\" (or words to that effect),\nI sent Roger a very calm, carefully-writt...",
+        "probability": 1.0
+      },
+      {
+        "document": "I must admit that this point has been running through my mind for most of\nthe discussion: one the dice are out there, it won't be long before someone\ndecaps it and, after a bit of work, has full detai...",
+        "probability": 1.0
+      },
+      {
+        "document": "Here are some ideas for those of you who want to oppose the White\nHouse Clipper chip crypto initiative.  I think this is going to be a\ntough measure to fight, since the Government has invested a lot o...",
+        "probability": 1.0
+      }
+    ]
+  },
+  "boundary_cases": [
+    {
+      "index": 2453,
+      "document": "What's the deal?  c.s.h. has nothing on it yet.  Is it in OT, is it over,\nwhat?  I want to know!  We all want to know!  Where's Roger when you need\nhim?!?!?!?!  :-)\n\n--\n    Keith Keller\t\t\t\tLET'S GO RANGERS!!!!!\n\t\t\t\t\t\tLET'S GO QUAKERS!!!!!\n\tkkeller@ma...",
+      "margin": 0.0292,
+      "top_cluster": 3,
+      "top_probability": 0.5146,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4854
+    },
+    {
+      "index": 13767,
+      "document": "What's the deal?  c.s.h. has nothing on it yet.  Is it in OT, is it over,\nwhat?  I want to know!  We all want to know!  Where's Roger when you need\nhim?!?!?!?!  :-)\n\n--\n    Keith Keller\t\t\t\tLET'S GO RANGERS!!!!!\n\t\t\t\t\t\tLET'S GO QUAKERS!!!!!\n\tkkeller@ma...",
+      "margin": 0.0292,
+      "top_cluster": 3,
+      "top_probability": 0.5146,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4854
+    },
+    {
+      "index": 9175,
+      "document": "I can tell you that when AMSAT launched some birds along a Spot satellite\n(French), that during installation of some instruments on Spot 2, there\nheavily armed legionaires who had a `take no prisoners' look on there faces.\nSpot satellites are complet...",
+      "margin": 0.0297,
+      "top_cluster": 4,
+      "top_probability": 0.5149,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4851
+    },
+    {
+      "index": 20489,
+      "document": "I can tell you that when AMSAT launched some birds along a Spot satellite\n(French), that during installation of some instruments on Spot 2, there\nheavily armed legionaires who had a `take no prisoners' look on there faces.\nSpot satellites are complet...",
+      "margin": 0.0297,
+      "top_cluster": 4,
+      "top_probability": 0.5149,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4851
+    },
+    {
+      "index": 2722,
+      "document": "You mean they aren't already? Could have fooled me.\n\n...",
+      "margin": 0.0385,
+      "top_cluster": 0,
+      "top_probability": 0.5192,
+      "secondary_cluster": 4,
+      "secondary_probability": 0.4807
+    },
+    {
+      "index": 14036,
+      "document": "You mean they aren't already? Could have fooled me.\n\n...",
+      "margin": 0.0385,
+      "top_cluster": 0,
+      "top_probability": 0.5192,
+      "secondary_cluster": 4,
+      "secondary_probability": 0.4808
+    },
+    {
+      "index": 10875,
+      "document": "Harumph. Getting published in these newsletters is hardly something\nto aspire to. :-)\n\tI can't really argue with your logic, though I think you may be\nextrapolating a bit recklessly from what appears to be a sample size of\none. Even if what you say a...",
+      "margin": 0.1123,
+      "top_cluster": 4,
+      "top_probability": 0.5561,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4439
+    },
+    {
+      "index": 22189,
+      "document": "Harumph. Getting published in these newsletters is hardly something\nto aspire to. :-)\n\tI can't really argue with your logic, though I think you may be\nextrapolating a bit recklessly from what appears to be a sample size of\none. Even if what you say a...",
+      "margin": 0.1123,
+      "top_cluster": 4,
+      "top_probability": 0.5561,
+      "secondary_cluster": 0,
+      "secondary_probability": 0.4439
+    },
+    {
+      "index": 6964,
+      "document": "RS Components (they exist in Australia and the UK. Don't know about the US) have\nlittle chips called Isolated MAX 250 and 251. They give you isolated RS-232 from\na single 5V supply. External components are 4 caps, 4 optoisolators, a diode,\nand an isl...",
+      "margin": 0.1332,
+      "top_cluster": 0,
+      "top_probability": 0.5666,
+      "secondary_cluster": 1,
+      "secondary_probability": 0.4334
+    },
+    {
+      "index": 18278,
+      "document": "RS Components (they exist in Australia and the UK. Don't know about the US) have\nlittle chips called Isolated MAX 250 and 251. They give you isolated RS-232 from\na single 5V supply. External components are 4 caps, 4 optoisolators, a diode,\nand an isl...",
+      "margin": 0.1332,
+      "top_cluster": 0,
+      "top_probability": 0.5666,
+      "secondary_cluster": 1,
+      "secondary_probability": 0.4334
+    }
+  ]
+}

@@ -4,7 +4,9 @@ import time
 import re
 import psutil
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends
+from fastapi.security import APIKeyHeader
+import json
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -63,10 +65,110 @@ reranker = None
 rag_generator = None
 analytics_tracker = None
 
+# Global caches for optimized clusters and t-SNE coordinate projections
+cached_cluster_analysis = None
+cached_tsne_visualization = None
+
+# API Admin Security Token Configuration
+API_TOKEN = os.environ.get("ADMIN_TOKEN", "vectormind_admin_secret")
+api_key_header = APIKeyHeader(name="X-Admin-Token", auto_error=False)
+
+def verify_admin_token(token: Optional[str] = Depends(api_key_header)):
+    if not token or token != API_TOKEN:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: Invalid or missing X-Admin-Token header."
+        )
+
 # Custom Logger
 def log_info(msg: str):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [INFO] {msg}")
+
+def load_cached_files():
+    """Load pre-calculated cluster analysis and t-SNE visualization cache from disk."""
+    global cached_cluster_analysis, cached_tsne_visualization
+    
+    dir_name = os.path.dirname(config.INDEX_PATH)
+    cluster_path = os.path.join(dir_name, "cluster_analysis.json")
+    if os.path.exists(cluster_path):
+        try:
+            with open(cluster_path, 'r', encoding='utf-8') as f:
+                cached_cluster_analysis = json.load(f)
+            log_info("Loaded cached cluster analysis successfully.")
+        except Exception as e:
+            log_info(f"Failed to load cached cluster analysis: {e}")
+            
+    tsne_path = os.path.join(dir_name, "tsne_visualization.json")
+    if os.path.exists(tsne_path):
+        try:
+            with open(tsne_path, 'r', encoding='utf-8') as f:
+                cached_tsne_visualization = json.load(f)
+            log_info("Loaded cached t-SNE visualization successfully.")
+        except Exception as e:
+            log_info(f"Failed to load cached t-SNE visualization: {e}")
+
+def precalculate_and_save_caches(embeddings, raw_data):
+    """Pre-calculate and save GMM clusters and t-SNE coordinates to disk."""
+    global fuzzy_clustering, cached_cluster_analysis, cached_tsne_visualization
+    
+    log_info("Pre-calculating GMM cluster memberships for cache...")
+    memberships = fuzzy_clustering.predict_proba(embeddings)
+    analysis = analyze_clusters(raw_data, memberships, fuzzy_clustering.n_clusters)
+    
+    # Store cluster analysis cache
+    cached_cluster_analysis = {
+        "n_clusters": fuzzy_clustering.n_clusters,
+        "clusters": {str(k): v for k, v in analysis["representative_docs"].items()},
+        "boundary_cases": analysis["boundary_cases"]
+    }
+    dir_name = os.path.dirname(config.INDEX_PATH)
+    os.makedirs(dir_name, exist_ok=True)
+    cluster_path = os.path.join(dir_name, "cluster_analysis.json")
+    try:
+        with open(cluster_path, 'w', encoding='utf-8') as f:
+            json.dump(cached_cluster_analysis, f, indent=2)
+        log_info(f"Saved cluster analysis cache to {cluster_path}")
+    except Exception as e:
+        log_info(f"Failed to save cluster analysis cache: {e}")
+        
+    log_info("Pre-calculating t-SNE coordinates for cache...")
+    from sklearn.manifold import TSNE
+    perplexity_val = min(30, max(5, len(raw_data) // 5))
+    try:
+        tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity_val, max_iter=1000)
+    except TypeError:
+        tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity_val, n_iter=1000)
+    embeddings_2d = tsne.fit_transform(embeddings)
+    
+    dominant_clusters = np.argmax(memberships, axis=1)
+    
+    points = []
+    for idx, (x, y) in enumerate(embeddings_2d):
+        snippet = raw_data[idx][:120].strip().replace("\n", " ")
+        if len(raw_data[idx]) > 120:
+            snippet += "..."
+            
+        points.append({
+            "id": idx,
+            "x": round(float(x), 4),
+            "y": round(float(y), 4),
+            "document": snippet,
+            "cluster": int(dominant_clusters[idx]),
+            "probability": round(float(memberships[idx][dominant_clusters[idx]]), 4)
+        })
+        
+    cached_tsne_visualization = {
+        "n_documents": len(raw_data),
+        "points": points
+    }
+    tsne_path = os.path.join(dir_name, "tsne_visualization.json")
+    try:
+        with open(tsne_path, 'w', encoding='utf-8') as f:
+            json.dump(cached_tsne_visualization, f, indent=2)
+        log_info(f"Saved t-SNE visualization cache to {tsne_path}")
+    except Exception as e:
+        log_info(f"Failed to save t-SNE visualization cache: {e}")
 
 class QueryRequest(BaseModel):
     query: str
@@ -132,6 +234,7 @@ async def startup_event():
                 faiss_index.load(config.INDEX_PATH, config.DOCS_PATH)
                 fuzzy_clustering.load(config.GMM_PATH)
                 log_info("Persisted index and model loaded successfully!")
+                load_cached_files()
             except Exception as e:
                 log_info(f"Failed to load persisted files: {e}. Rebuilding instead.")
                 build_and_persist_index()
@@ -183,6 +286,7 @@ def build_and_persist_index():
     faiss_index.save(config.INDEX_PATH, config.DOCS_PATH)
     fuzzy_clustering.save(config.GMM_PATH)
     log_info("Persisted stores saved successfully!")
+    precalculate_and_save_caches(embeddings, raw_data)
     
     # Re-fit BM25 on indexing
     if bm25_retriever:
@@ -458,7 +562,7 @@ def run_reindex_task():
         reindex_status["error"] = str(e)
         print(f"[ERROR] Reindexing background task error: {e}")
 
-@app.post("/reindex")
+@app.post("/reindex", dependencies=[Depends(verify_admin_token)])
 async def rebuild_search_index(background_tasks: BackgroundTasks):
     """Trigger complete document reindexing and GMM model fit in the background."""
     global reindex_status
@@ -500,6 +604,10 @@ async def run_system_evaluation(k: int = Query(5, description="Evaluation thresh
 @app.get("/clusters/visualization")
 async def get_clusters_visualization():
     """Generate 2D t-SNE coordinate projections for interactive frontend topic mapping."""
+    global cached_tsne_visualization
+    if cached_tsne_visualization is not None:
+        return cached_tsne_visualization
+        
     if not faiss_index or not faiss_index.documents or not embedding_model or not fuzzy_clustering:
         raise HTTPException(status_code=503, detail="System components not fully loaded")
         
@@ -552,7 +660,7 @@ async def get_cache_stats():
         raise HTTPException(status_code=503, detail="Cache not initialized")
     return semantic_cache.get_stats()
 
-@app.delete("/cache")
+@app.delete("/cache", dependencies=[Depends(verify_admin_token)])
 async def clear_cache():
     """Clear the cache."""
     if not semantic_cache:
@@ -579,6 +687,10 @@ async def get_system_stats():
 @app.get("/clusters")
 async def get_clusters():
     """Cluster analytics with top representative documents per cluster."""
+    global cached_cluster_analysis
+    if cached_cluster_analysis is not None:
+        return cached_cluster_analysis
+        
     if not faiss_index or not fuzzy_clustering or not embedding_model:
         raise HTTPException(status_code=503, detail="Clustering module not fully initialized")
         
