@@ -44,7 +44,11 @@ app.add_middleware(
 )
 
 # Mount Next.js static production bundle UI at /ui
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out"))
+# If Next.js has basePath: '/ui', it outputs into 'frontend/out/ui/'
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out", "ui"))
+if not os.path.exists(frontend_dir):
+    frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out"))
+
 if os.path.exists(frontend_dir):
     app.mount("/ui", StaticFiles(directory=frontend_dir, html=True), name="ui")
     print(f"[INFO] Static frontend UI successfully mounted at /ui from {frontend_dir}")
