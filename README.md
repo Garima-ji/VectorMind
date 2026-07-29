@@ -13,13 +13,13 @@ app_port: 8000
 
 ![VectorMind Dashboard UI](https://raw.githubusercontent.com/Garima-ji/VectorMind/main/docs/assets/dashboard.png)
 
-VectorMind is a production-grade, portfolio-quality intelligent retrieval and RAG search platform. It is fully aligned with the **Trademarkia - AI&ML Engineer Task** specifications, implementing semantic search over the **20 Newsgroups corpus** using FAISS, a Gaussian Mixture Model (GMM) fuzzy clustering layer, and a custom cluster-aware semantic cache built from first principles.
+VectorMind is an intelligent semantic search and Retrieval-Augmented Generation (RAG) platform developed as part of the Trademarkia AI/ML Engineer Technical Assignment. Built on the 20 Newsgroups dataset, it leverages Sentence Transformers, FAISS vector search, Gaussian Mixture Model (GMM) fuzzy clustering, and a custom semantic cache to deliver fast, context-aware, and semantically relevant document retrieval.
 
 The platform also includes a Next.js web application for real-time topic visualizations (t-SNE coordinates), telemetry analytics, and standard Information Retrieval (IR) benchmarking dashboards.
 
 ---
 
-## 🚀 Trademarkia Assignment Architecture
+## Architecture
 
 VectorMind implements all four core components requested in the specifications:
 
