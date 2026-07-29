@@ -19,34 +19,61 @@ The platform also includes a Next.js web application for real-time topic visuali
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-VectorMind implements all four core components requested in the specifications:
+VectorMind is designed as a modular Retrieval-Augmented Generation (RAG) system consisting of four core components that enable efficient semantic retrieval, intelligent document organization, low-latency caching, and scalable API deployment.
 
-### 1. Preprocessing & FAISS Vector DB (Part 1)
-* **Pre-processing**: Noisy headers, quoting replies, and signatures are stripped using scikit-learn standard filters to keep search focused on pure message body semantics.
-* **Embeddings**: Text is encoded into 384-dimensional dense vectors using the SentenceTransformers `all-MiniLM-L6-v2` model.
-* **Vector Index**: Uses a **FAISS** (Facebook AI Similarity Search) FlatIP index for fast cosine similarity lookups, backed by a zero-dependency **NumPy fallback** for environment flexibility.
+### 🔹 Preprocessing & Vector Search
 
-### 2. GMM Fuzzy Clustering & Boundary Analysis (Part 2)
-* **Soft Assignment**: Implements a Gaussian Mixture Model (GMM) clustering layer. Instead of hard categorizing, it returns a probability distribution mapping documents to multiple overlapping topics.
-* **Number of Clusters**: Configured to **20 clusters** to naturally capture the 20 newsgroups categories.
-* **Boundary Analysis**: Dynamically extracts boundary/uncertain documents—specifically locating items where the probability gap between the top two assigned clusters is lowest.
-
-### 3. Custom Semantic Cache (Part 3)
-* **First Principles**: Built entirely using NumPy and scikit-learn cosine similarity (without Redis, Memcached, or external caching middleware).
-* **Cluster-Aware Lookups**: Groups cache entries using their GMM dominant cluster. When a new query is run, the cache only searches entries in the matching cluster, preventing search latencies from scaling as the cache grows.
-* **Tunable Parameter**: Employs a similarity threshold of `0.95`, balancing search accuracy (precision) against query acceleration (recall).
-
-### 4. FastAPI Service & State Management (Part 4)
-Exposes clean REST endpoints on port **8000**:
-* `POST /query`: Accepts a query, checks the cluster-aware semantic cache, falls back to a hybrid FAISS+BM25 and Cross-Encoder reranker on a cache miss, and generates grounded RAG answers.
-* `GET /cache/stats`: Returns cache metrics (`total_entries`, `hit_count`, `miss_count`, `hit_rate`).
-* `DELETE /cache`: Resets and flushes all cache entries and statistics (requires `X-Admin-Token` header).
-* `GET /reindex/status`: Check progress of background index jobs.
-* `/ui/`: Serves the integrated static frontend dashboard directly from uvicorn, unifying backend and frontend on a single port.
+- Cleans email content by removing noisy headers, quoted replies, and signatures to retain only meaningful semantic content.
+- Generates **384-dimensional dense embeddings** using the SentenceTransformers **`all-MiniLM-L6-v2`** model.
+- Performs high-speed semantic search with a **FAISS FlatIP** index for cosine similarity.
+- Includes a lightweight **NumPy fallback** for environments where FAISS is unavailable.
 
 ---
+
+### 🔹 Semantic Clustering & Boundary Analysis
+
+- Uses a **Gaussian Mixture Model (GMM)** for soft clustering, allowing documents to belong to multiple topics with different probabilities.
+- Configured with **20 semantic clusters** to organize documents into coherent groups.
+- Identifies **boundary documents** by analyzing the probability gap between the top two cluster assignments, highlighting semantically ambiguous content.
+
+---
+
+### 🔹 Cluster-Aware Semantic Cache
+
+- Implements a custom semantic cache using **NumPy** and **scikit-learn cosine similarity**, without external caching frameworks.
+- Organizes cached queries by their dominant GMM cluster, reducing lookup time as the cache grows.
+- Uses a configurable cosine similarity threshold of **0.95** to balance retrieval accuracy and cache efficiency.
+
+---
+
+### 🔹 FastAPI Service Layer
+
+The backend exposes a RESTful API for querying, cache management, indexing, and frontend serving.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /query` | Checks the semantic cache before executing Hybrid Retrieval (**FAISS + BM25**) with Cross-Encoder reranking to generate grounded RAG responses. |
+| `GET /cache/stats` | Returns cache statistics including total entries, hits, misses, and hit rate. |
+| `DELETE /cache` | Clears all cache entries and statistics (requires `X-Admin-Token`). |
+| `GET /reindex/status` | Reports the progress of background indexing operations. |
+| `/ui/` | Serves the integrated frontend dashboard through Uvicorn on the same deployment. |
+
+---
+
+## ✨ Key Features
+
+- Hybrid Retrieval (FAISS + BM25)
+- Cross-Encoder Re-ranking
+- Retrieval-Augmented Generation (RAG)
+- GMM-based Semantic Clustering
+- Boundary Document Detection
+- Cluster-Aware Semantic Cache
+- 384-Dimensional Sentence Embeddings
+- FastAPI REST API
+- Integrated Web Dashboard
+- Modular and Extensible Architecture
 
 ## 📂 Directory Structure
 
@@ -95,8 +122,7 @@ VectorMind
    python -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000
    ```
 
-### 2. View the Integrated UI Dashboard (No Node.js process needed!)
-
+### 2. View the Integrated UI Dashboard 
 Since Next.js is compiled and served statically from FastAPI:
 1. Open the local address: `http://localhost:8000/ui/` in your browser.
 2. The UI dashboard runs immediately, fetching queries and metrics directly.
