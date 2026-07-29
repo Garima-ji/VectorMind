@@ -1,4 +1,0 @@
-# Mark Next.js static build files as generated to hide them from GitHub language statistics
-frontend/out/** linguist-generated
-frontend/out/_next/** linguist-generated
-docs/assets/** linguist-generated
