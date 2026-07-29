@@ -421,10 +421,7 @@ export default function Home() {
               <Zap className="h-5 w-5 animate-pulse" />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">
-              VectorMind{" "}
-              <span className="text-xs font-semibold px-2 py-0.5 border border-indigo-400/30 rounded-full text-indigo-500 ml-1">
-                v2.0 RAG
-              </span>
+              VectorMind
             </span>
           </div>
 
