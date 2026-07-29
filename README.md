@@ -9,6 +9,10 @@ app_port: 8000
 
 # VectorMind: Intelligent Semantic Search, Cache & RAG Platform
 
+> **Live Demo Platform**: [https://garimap20-vectormind-api.hf.space/ui/](https://garimap20-vectormind-api.hf.space/ui/)
+
+![VectorMind Dashboard UI](https://raw.githubusercontent.com/Garima-ji/VectorMind/main/docs/assets/dashboard.png)
+
 VectorMind is a production-grade, portfolio-quality intelligent retrieval and RAG search platform. It is fully aligned with the **Trademarkia - AI&ML Engineer Task** specifications, implementing semantic search over the **20 Newsgroups corpus** using FAISS, a Gaussian Mixture Model (GMM) fuzzy clustering layer, and a custom cluster-aware semantic cache built from first principles.
 
 The platform also includes a Next.js web application for real-time topic visualizations (t-SNE coordinates), telemetry analytics, and standard Information Retrieval (IR) benchmarking dashboards.
