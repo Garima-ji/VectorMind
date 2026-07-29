@@ -4,10 +4,11 @@ import time
 import re
 import psutil
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.feature_extraction.text import TfidfVectorizer
+from fastapi.staticfiles import StaticFiles
 import numpy as np
 
 from backend.embeddings.embedding_model import EmbeddingModel
@@ -39,6 +40,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Next.js static production bundle UI at /ui
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "out"))
+if os.path.exists(frontend_dir):
+    app.mount("/ui", StaticFiles(directory=frontend_dir, html=True), name="ui")
+    print(f"[INFO] Static frontend UI successfully mounted at /ui from {frontend_dir}")
+else:
+    print(f"[WARNING] Static frontend directory not found at: {frontend_dir}. UI route is disabled.")
 
 # Global system components
 embedding_model = None
@@ -424,15 +433,46 @@ async def get_analytics_dashboard():
         raise HTTPException(status_code=503, detail="Analytics component not initialized")
     return analytics_tracker.get_analytics()
 
-@app.post("/reindex")
-async def rebuild_search_index():
-    """Trigger complete document reindexing and GMM model fit."""
+# Global state tracking for reindexing progress
+reindex_status = {
+    "status": "idle", # "idle", "running", "completed", "failed"
+    "message": "No active reindexing job.",
+    "error": None,
+    "last_run": None
+}
+
+def run_reindex_task():
+    global reindex_status
+    reindex_status["status"] = "running"
+    reindex_status["message"] = "Reindexing full corpus and training GMM model..."
+    reindex_status["error"] = None
     try:
         build_and_persist_index()
         fit_tfidf_search()
-        return {"status": "success", "message": "Search index and clustering models successfully rebuilt."}
+        reindex_status["status"] = "completed"
+        reindex_status["message"] = "Reindexing successfully completed."
+        reindex_status["last_run"] = time.strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reindexing failed: {str(e)}")
+        reindex_status["status"] = "failed"
+        reindex_status["message"] = "Reindexing failed."
+        reindex_status["error"] = str(e)
+        print(f"[ERROR] Reindexing background task error: {e}")
+
+@app.post("/reindex")
+async def rebuild_search_index(background_tasks: BackgroundTasks):
+    """Trigger complete document reindexing and GMM model fit in the background."""
+    global reindex_status
+    if reindex_status["status"] == "running":
+        return {"status": "running", "message": "Reindexing is already in progress."}
+        
+    background_tasks.add_task(run_reindex_task)
+    return {"status": "accepted", "message": "Reindexing task started in the background."}
+
+@app.get("/reindex/status")
+async def get_reindex_status():
+    """Check the status of the background reindexing task."""
+    global reindex_status
+    return reindex_status
 
 @app.get("/evaluate")
 async def run_system_evaluation(k: int = Query(5, description="Evaluation threshold parameter")):

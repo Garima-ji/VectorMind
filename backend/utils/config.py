@@ -30,7 +30,7 @@ TOP_K_MAX = 100
 INDEX_PATH = "backend/data/index_store/faiss_index.bin"
 DOCS_PATH = "backend/data/index_store/documents.json"
 GMM_PATH = "backend/data/index_store/gmm_model.pkl"
-ANALYTICS_PATH = "backend/data/analytics.json"
+ANALYTICS_PATH = "backend/data/analytics.db"
 
 # JUSTIFICATION FOR CLUSTER COUNT:
 # The 20 Newsgroups dataset has 20 ground-truth target classes (e.g., sci.med, rec.autos, alt.atheism).

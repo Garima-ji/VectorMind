@@ -16,7 +16,7 @@ class FuzzyClustering:
             random_state: Random seed
         """
         self.n_clusters = n_clusters
-        self.gmm = GaussianMixture(n_components=n_clusters, random_state=random_state)
+        self.gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', random_state=random_state)
         self.is_fitted = False
     
     def fit(self, embeddings):
